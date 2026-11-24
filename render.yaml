@@ -1,0 +1,46 @@
+# Render Blueprint for the LYFTR AI backend.
+#
+# A paid instance type is required: Render's free tier does not support
+# persistent disks, and SQLite history would be lost on every deploy/restart.
+#
+# Usage:
+#   1. Push this repository to GitHub.
+#   2. In Render, choose "New > Blueprint" and select the repository.
+#   3. Fill the values marked `sync: false` when prompted.
+#   4. Set ALLOWED_ORIGINS to the deployed frontend origin, then redeploy.
+
+services:
+  - type: web
+    name: lyftr-ai-api
+    runtime: docker
+    # 2 GB (1c-2g) is deliberate headroom: LiteLLM imports a large provider
+    # surface. The 512 MB plans may be too small for this process.
+    plan: 1c-2g
+    region: oregon
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////data/app.db
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEYS
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ENABLE_FAILURE_SIMULATION
+        value: "true"
+      - key: CACHE_ENABLED
+        value: "true"
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+
+    disk:
+      name: lyftr-data
+      mountPath: /data
+      sizeGB: 1

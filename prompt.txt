@@ -1,0 +1,908 @@
+# ROLE: Principal Full-Stack Engineer, AI Infrastructure Engineer & Senior UI/UX Designer
+
+You are an autonomous senior software engineering agent responsible for designing, implementing, testing, containerizing, and deploying a complete production-quality full-stack application.
+
+Your task is to build the entire **LYFTR AI — LLM Chatbot with Key Failover and Response Caching** assignment.
+
+You must deliver a fully working application, not a prototype, mockup, static website, or partially implemented project.
+
+## PRIMARY REFERENCES
+
+**Technical specification:** `LYFTR AI.pdf` (attached)
+
+**Frontend design reference:** https://opencode.ai/
+
+Read the complete PDF carefully before writing any code. Inspect every requirement, API contract, error condition, testing instruction, and submission requirement.
+
+The PDF is the single source of truth for functional requirements. This prompt adds implementation and visual design instructions but must never override the PDF.
+
+---
+
+# 1. CORE OBJECTIVE
+
+Build a complete, publicly deployable LLM chatbot featuring:
+
+- Multi-turn conversation memory.
+- LiteLLM integration.
+- Automatic API key failover.
+- Built-in LiteLLM response caching.
+- Accurate per-request token tracking.
+- Per-message response metadata.
+- SQLite persistent session storage.
+- A polished, responsive React frontend.
+- Docker-based local execution.
+- Automated backend tests.
+- Public frontend and backend deployments.
+
+The application must comply exactly with the assignment's API and UI contracts.
+
+Prioritize functional correctness, resilience, performance, code quality, and visual fidelity.
+
+# 2. FRONTEND DESIGN — OPENCODE.AI REFERENCE
+
+**Reference website:** https://opencode.ai/
+
+This is a high-priority requirement.
+
+Use the OpenCode website as the visual reference for the application's design system.
+
+The frontend should reproduce the reference's overall visual language as closely as possible while adapting the layout for our chatbot functionality.
+
+Do not create a generic ChatGPT clone.
+
+## Mandatory reference inspection
+
+Before implementing the UI:
+
+1. Open https://opencode.ai/ using an available browser tool.
+2. Inspect its desktop and mobile layouts.
+3. Capture screenshots where browser tooling permits.
+4. Study the typography, font weights, line heights, spacing, grid, and alignment.
+5. Inspect the background colors, borders, navigation, buttons, and interactive states.
+6. Analyze the visual hierarchy, content widths, and responsive behavior.
+7. Create a reusable design system based on those observations.
+
+Do not guess exact styling values when they can be inspected.
+
+If browser inspection is unavailable, explicitly report that limitation and use the available reference information. Never claim pixel-perfect fidelity without visual verification.
+
+## Visual requirements
+
+Match the reference's:
+
+- Minimalist, developer-focused aesthetic.
+- Strong typography and clear visual hierarchy.
+- Restrained color palette.
+- Precise spacing and alignment.
+- Clean navigation.
+- Subtle borders and separators.
+- Minimal, purposeful animations.
+- Responsive layouts.
+- High-quality hover and focus states.
+- Professional SaaS product appearance.
+
+Adapt the reference to our own application rather than copying OpenCode branding, logos, copyrighted illustrations, or proprietary assets.
+
+## Application branding
+
+Application name: **LYFTR AI**
+
+Subtitle: **Reliable AI. Every Response.**
+
+Product description:
+
+"An intelligent conversational AI powered by automatic model failover, response caching, and persistent conversation memory."
+
+All visible content must refer to LYFTR AI and our actual implemented features.
+
+Do not leave OpenCode product names, links, marketing copy, or unrelated sections in the application.
+
+## Required pages and components
+
+### A. Main chatbot interface
+
+Create a functional chat application with:
+
+- LYFTR AI branding.
+- Minimal navigation.
+- Main conversation area.
+- Clearly distinguished user and assistant messages.
+- Beautiful message input area.
+- Send button.
+- Loading indicator.
+- Empty-state welcome screen.
+- Responsive mobile layout.
+- Readable error messages.
+- Smooth conversation scrolling.
+
+The chat interface must be the primary experience.
+
+### B. Assistant response metadata
+
+Every assistant response must display:
+
+- Resolution source: `LLM_CACHE` or `LIVE_INFERENCE`.
+- Actual model name.
+- Response latency in milliseconds.
+- Input token count.
+- Output token count.
+
+Additional metadata may include:
+
+- Key identifier.
+- Fallback attempts.
+
+Use compact, polished metadata elements inspired by the reference website.
+
+Never display actual API keys.
+
+### C. Optional system prompt
+
+Provide an optional session-level system prompt editor if it can be implemented without compromising required functionality.
+
+### D. Responsive behavior
+
+Support:
+
+- Desktop.
+- Tablet.
+- Mobile.
+
+No horizontal overflow, broken components, unreadable text, or overlapping elements.
+
+## Frontend technology
+
+Use:
+
+- React.
+- TypeScript.
+- Vite.
+- Tailwind CSS.
+- Lucide React icons.
+
+Use Framer Motion only if animations genuinely improve the interface.
+
+Use reusable, accessible components and clean architecture.
+
+## Required data-testid attributes
+
+Implement exactly:
+
+- `chat-input`
+- `send-button`
+- `assistant-message`
+- `meta-source`
+- `meta-model`
+- `meta-latency`
+- `meta-input-tokens`
+- `meta-output-tokens`
+- `system-prompt-input` (only if implemented)
+
+Place metadata test IDs inside their corresponding assistant message containers.
+
+Do not rename these attributes.
+
+## Frontend behavior
+
+- Generate a new session ID on every page load.
+- Send only the new message to the backend.
+- Clear the input after sending.
+- Display the complete multi-turn conversation.
+- Prevent accidental duplicate submissions.
+- Show readable 422 and 503 errors in the chat.
+- Never display a blank screen after an API error.
+- Communicate with the deployed backend using environment-based configuration.
+- Preserve accessibility and keyboard usability.
+
+# 3. BACKEND ARCHITECTURE
+
+Use:
+
+- Python.
+- FastAPI.
+- Pydantic.
+- LiteLLM.
+- SQLite.
+- SQLAlchemy or a clean equivalent database layer.
+- Pytest.
+- HTTPX for API testing.
+
+Organize the backend into maintainable modules.
+
+Suggested structure:
+
+backend/
+  app/
+    main.py
+    config.py
+    database.py
+    models.py
+    schemas.py
+    services/
+      chat_service.py
+      llm_service.py
+      cache_service.py
+      failover_service.py
+    routes/
+      chat.py
+      health.py
+      sessions.py
+  tests/
+  requirements.txt
+  Dockerfile
+
+You may improve this structure if needed.
+
+Do not introduce unnecessary abstractions or external infrastructure.
+
+# 4. EXACT API CONTRACT
+
+Implement the three endpoints specified in the PDF.
+
+## GET /health
+
+Return HTTP 200 only when:
+
+- Application is running.
+- SQLite is reachable.
+- Key pool is configured and loaded.
+- At least two API keys are configured.
+- Cache is enabled.
+
+Required response:
+
+```json
+{
+  "status": "ok",
+  "keys_configured": 2,
+  "cache_enabled": true
+}
+```
+
+`keys_configured` must reflect the actual configured count.
+
+## POST /chat
+
+Request:
+
+```json
+{
+  "session_id": "s-7f3a",
+  "message": "What is the capital of France?"
+}
+```
+
+Optional field:
+
+```json
+{
+  "system_prompt": "You are a helpful assistant."
+}
+```
+
+Validation:
+
+- `session_id`: required string, 1–128 characters.
+- `message`: required string, 1–4000 characters after trimming.
+- Invalid requests return HTTP 422.
+- Unknown session IDs start new sessions.
+
+Required response structure:
+
+```json
+{
+  "session_id": "s-7f3a",
+  "reply": "The capital of France is Paris.",
+  "metadata": {
+    "resolution_source": "LIVE_INFERENCE",
+    "model": "gemini/gemini-2.0-flash",
+    "latency_ms": 812,
+    "input_tokens": 42,
+    "output_tokens": 9,
+    "key_id": "key_1",
+    "fallback_attempts": 0
+  }
+}
+```
+
+The example values are illustrative, not hardcoded.
+
+Required metadata rules:
+
+- `resolution_source`: exactly `LIVE_INFERENCE` or `LLM_CACHE`.
+- `model`: actual LiteLLM model name.
+- `latency_ms`: integer, measured server-side.
+- `input_tokens`: prompt tokens for this request.
+- `output_tokens`: completion tokens for this request.
+- `key_id`: successful key identifier or null on cache hit.
+- `fallback_attempts`: failed keys before success, or zero on cache hit.
+
+Never return accumulated conversation token totals.
+
+## GET /sessions/{session_id}/messages
+
+Return messages in chronological order.
+
+Required response:
+
+```json
+{
+  "session_id": "s-7f3a",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the capital of France?"
+    },
+    {
+      "role": "assistant",
+      "content": "The capital of France is Paris.",
+      "metadata": {
+        "resolution_source": "LIVE_INFERENCE",
+        "input_tokens": 42,
+        "output_tokens": 9
+      }
+    }
+  ]
+}
+```
+
+Include all available assistant metadata where appropriate.
+
+Never expose system prompts as conversation messages.
+
+Unknown sessions must return:
+
+HTTP 404
+
+```json
+{
+  "detail": "session not found"
+}
+```
+
+# 5. LITELLM INTEGRATION AND KEY FAILOVER
+
+Use LiteLLM as the LLM gateway.
+
+Configure a pool of at least two API keys using:
+
+`LLM_API_KEYS`
+
+Example:
+
+`LLM_API_KEYS=key_value_1,key_value_2`
+
+Never hardcode credentials.
+
+Assign identifiers:
+
+- `key_1`
+- `key_2`
+- `key_3`, etc.
+
+Implement automatic failover for:
+
+- HTTP 429.
+- Provider quota exhaustion.
+- HTTP 500.
+- HTTP 502.
+- HTTP 503.
+- Other applicable provider-side 5xx failures.
+
+Expected behavior:
+
+1. Attempt the first available key.
+2. Detect eligible failures.
+3. Retry using the next configured key.
+4. Continue until a request succeeds or the pool is exhausted.
+5. Return the actual model response.
+6. Record the successful key identifier.
+7. Report the number of failed keys.
+
+Use LiteLLM for provider calls and failover functionality. Ensure the implementation actually satisfies the required observable behavior.
+
+Do not fake failover by changing metadata without switching keys.
+
+If every provider fails, return:
+
+HTTP 503
+
+```json
+{
+  "detail": "all providers unavailable"
+}
+```
+
+Do not save failed requests to SQLite.
+
+Never expose provider stack traces or API secrets.
+
+# 6. FAILURE SIMULATION
+
+Implement the required header:
+
+`X-Simulate-Failure`
+
+Examples:
+
+`X-Simulate-Failure: key_1=429`
+
+`X-Simulate-Failure: key_1=429,key_2=500`
+
+`X-Simulate-Failure: *=429`
+
+Supported simulated statuses:
+
+- 429
+- 500
+- 502
+- 503
+
+Simulation must be enabled only when:
+
+`ENABLE_FAILURE_SIMULATION=true`
+
+The deployed backend must have this enabled for evaluation.
+
+Required outcomes:
+
+### Test 1
+
+Header:
+
+`key_1=429`
+
+Expected:
+
+- HTTP 200.
+- `key_id = key_2`.
+- `fallback_attempts = 1`.
+- Real LLM answer.
+
+### Test 2
+
+Header:
+
+`key_1=500`
+
+Expected:
+
+- HTTP 200.
+- `key_id = key_2`.
+- Real LLM answer.
+
+### Test 3
+
+Header:
+
+`*=429`
+
+Expected:
+
+- HTTP 503.
+- Exact detail: `all providers unavailable`.
+- No new session history records.
+
+Simulation must affect only the current request.
+
+Do not globally disable API keys.
+
+Handle the interaction between caching and simulated failures carefully so failure tests cannot be accidentally bypassed by an existing cached response.
+
+# 7. RESPONSE CACHING
+
+Use LiteLLM's built-in caching mechanism.
+
+Do not replace it with a custom dictionary-only cache.
+
+Allowed backends:
+
+- In-memory.
+- Disk.
+
+Do not use Redis or other external storage services.
+
+Cache identity must depend on:
+
+- Model.
+- Complete system prompt.
+- Full conversation history.
+- Current user message.
+
+Do not use session ID alone as the cache key.
+
+## Required caching behavior
+
+First request:
+
+- Cache miss.
+- Call the LLM.
+- Return `LIVE_INFERENCE`.
+
+Identical first message in a different new session:
+
+- Cache hit.
+- Return `LLM_CACHE`.
+- Return identical reply text.
+- Return stored input and output token usage.
+- Set `key_id = null`.
+- Set `fallback_attempts = 0`.
+
+A different message must never return an unrelated cached response.
+
+A changed conversation history must produce a different cache identity.
+
+A changed system prompt must also change cache identity.
+
+Cache hits must be faster than live inference.
+
+Ensure cache metadata accurately reflects whether LiteLLM actually reused a response.
+
+Do not infer cache hits solely from response similarity.
+
+# 8. SQLITE SESSION STORAGE
+
+Use SQLite exclusively.
+
+Required configuration:
+
+`DATABASE_URL=sqlite:////data/app.db`
+
+The SQLite database must live in a persistent Docker volume.
+
+Automatically create the schema at startup.
+
+Required minimum table:
+
+```sql
+CREATE TABLE messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    metadata TEXT,
+    created_at TEXT NOT NULL
+);
+```
+
+Additional tables or indexes are permitted.
+
+Requirements:
+
+- Store user and assistant messages.
+- Associate messages with session IDs.
+- Preserve chronological order.
+- Store assistant metadata as JSON.
+- Store timestamps in ISO-8601 format.
+- Isolate conversations by session.
+- Retrieve history correctly.
+- Preserve data after container restarts.
+
+Handle database writes safely.
+
+Only commit successful user/assistant exchanges.
+
+# 9. DOCKER AND LOCAL DEVELOPMENT
+
+Create multi-stage Dockerfiles for both services.
+
+Required local commands:
+
+```bash
+make up
+make down
+```
+
+After `make up`:
+
+Frontend:
+
+`http://localhost:3000`
+
+Backend:
+
+`http://localhost:8000`
+
+Requirements:
+
+- Root-level `docker-compose.yml`.
+- Named persistent Docker volume mounted at `/data`.
+- Small production runtime images.
+- Environment-based configuration.
+- Working frontend/backend networking.
+- Correct CORS configuration.
+- Health checks where appropriate.
+- No credentials committed to Git.
+
+Verify the complete stack locally.
+
+# 10. TESTING AND VERIFICATION
+
+Create comprehensive automated backend tests using Pytest.
+
+At minimum, test:
+
+1. Health endpoint.
+2. Valid chat request.
+3. Missing session ID.
+4. Empty message.
+5. Message exceeding 4000 characters.
+6. Malformed JSON.
+7. Unknown session.
+8. Multi-turn memory.
+9. Session isolation.
+10. SQLite persistence.
+11. Cache miss.
+12. Cache hit.
+13. Cache identity across sessions.
+14. Different-message cache miss.
+15. Changed-history cache miss.
+16. Accurate per-request tokens.
+17. Key 1 simulated 429.
+18. Key 1 simulated 500.
+19. All keys simulated failure.
+20. Failed requests not saved.
+21. Correct fallback attempts.
+22. Correct metadata.
+23. No secret exposure.
+24. CORS behavior.
+
+Use deterministic mocks for automated tests where appropriate.
+
+Also perform real provider integration testing using configured credentials.
+
+Do not claim that mocked tests prove actual provider availability.
+
+All tests must pass before declaring the implementation complete.
+
+# 11. DEPLOYMENT
+
+Deploy the frontend and backend publicly.
+
+Suggested services:
+
+Frontend:
+- Vercel.
+- Netlify.
+- Cloudflare Pages.
+
+Backend:
+- Render.
+- Railway.
+- Fly.io.
+- Another compatible persistent-container hosting platform.
+
+Choose a backend host that supports a genuinely persistent SQLite volume.
+
+Do not assume an ephemeral filesystem will preserve session history.
+
+Configure:
+
+- `LLM_API_KEYS`
+- `DATABASE_URL`
+- `ALLOWED_ORIGINS`
+- `ENABLE_FAILURE_SIMULATION`
+- Any required LiteLLM provider/model variables.
+- Frontend backend-base-URL variable.
+
+Verify that the deployed frontend calls the deployed backend.
+
+Verify CORS from the real frontend origin.
+
+Test all three public endpoints.
+
+If deployment requires credentials, account authorization, or manual dashboard interaction, clearly request the necessary user action.
+
+Never invent deployment URLs or claim deployment succeeded without verification.
+
+# 12. README AND DOCUMENTATION
+
+Create a professional README using these exact required sections:
+
+1. Live URLs
+2. Run locally: with Docker and without
+3. Design decisions: key fallback, caching, SQLite session storage
+4. Verification: how to see failover, cache hits and per-message token usage
+5. Setup Used: your editor and AI tools
+6. Bonus features (if any): what you added beyond the requirements and why
+
+Include:
+
+- Architecture overview.
+- Installation instructions.
+- Environment variable setup.
+- Docker commands.
+- API examples.
+- Test commands.
+- Deployment instructions.
+- Troubleshooting.
+- Honest disclosure of AI tools used.
+
+Do not include real API keys.
+
+# 13. REPOSITORY STRUCTURE
+
+The final repository must contain:
+
+```text
+lyftr-ai/
+├── backend/
+│   ├── app/
+│   ├── tests/
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── Dockerfile
+├── docker-compose.yml
+├── Makefile
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+Organize additional files appropriately.
+
+# 14. SECURITY AND CODE QUALITY
+
+Follow production-oriented engineering practices:
+
+- No hardcoded secrets.
+- No API keys exposed to the frontend.
+- No sensitive values in logs.
+- Input validation.
+- Proper exception handling.
+- Safe CORS configuration.
+- Database error handling.
+- Clear separation of concerns.
+- Maintainable modules.
+- Reusable frontend components.
+- TypeScript type safety.
+- Python type hints.
+- No unused dependencies.
+- No unnecessary services.
+- No placeholder implementations.
+- No fake success responses.
+- No silent error swallowing.
+
+# 15. DEVELOPMENT EXECUTION STRATEGY
+
+Work autonomously through the following phases.
+
+## Phase 1 — Requirements analysis
+
+Read the PDF.
+
+Create a requirements checklist mapping every PDF requirement to its implementation and verification method.
+
+Identify potential integration risks before coding.
+
+## Phase 2 — Backend
+
+Implement:
+
+- FastAPI.
+- SQLite.
+- Session history.
+- LiteLLM.
+- Key failover.
+- Failure simulation.
+- Response caching.
+- Token tracking.
+- Exact API contracts.
+
+## Phase 3 — Frontend
+
+Inspect the OpenCode reference.
+
+Implement the design system and responsive chat interface.
+
+Connect every UI component to real backend data.
+
+## Phase 4 — Automated tests
+
+Implement and run tests.
+
+Fix failures.
+
+Repeat until the required tests pass.
+
+## Phase 5 — Docker
+
+Create Dockerfiles, Compose, and Makefile.
+
+Run the complete stack.
+
+Verify persistence and networking.
+
+## Phase 6 — Deployment
+
+Deploy both services if the required permissions and credentials are available.
+
+Verify public URLs and real LLM inference.
+
+## Phase 7 — Final audit
+
+Compare the completed project against every requirement in the PDF.
+
+Report any missing or partially implemented requirements.
+
+Fix all feasible issues before final delivery.
+
+# 16. VISUAL QUALITY ASSURANCE
+
+After implementing the frontend:
+
+1. Run the application.
+2. Open it in a browser.
+3. Capture desktop and mobile screenshots.
+4. Compare them with the inspected OpenCode reference.
+5. Correct typography differences.
+6. Correct spacing and alignment.
+7. Correct background and border styling.
+8. Verify responsive behavior.
+9. Verify the chat interface is usable.
+10. Repeat until the visual result is polished.
+
+Do not stop after generating JSX and CSS.
+
+Visual verification is mandatory when browser tools are available.
+
+# 17. FINAL ACCEPTANCE CRITERIA
+
+The project is complete only when:
+
+- All three API endpoints work.
+- Multi-turn chat works.
+- SQLite persistence works.
+- At least two API keys are supported.
+- Automatic failover works.
+- Simulated failures work.
+- Cache hits work correctly.
+- Token usage is accurate.
+- Required metadata appears in the UI.
+- Required test IDs exist.
+- Docker starts the complete stack.
+- Automated tests pass.
+- Frontend and backend communicate correctly.
+- Deployment is verified if credentials are available.
+- README is complete.
+- The frontend closely matches the OpenCode visual reference while using LYFTR AI branding.
+
+# 18. FINAL REPORT
+
+At completion, provide:
+
+1. Implemented features.
+2. Final repository structure.
+3. Test results and commands executed.
+4. Local run instructions.
+5. Deployment URLs, if actually deployed.
+6. Remaining manual actions.
+7. Known limitations.
+8. A 2–3 minute demo video recording script.
+9. A requirements compliance checklist.
+
+Distinguish verified results from untested claims.
+
+# FINAL INSTRUCTION
+
+You are not being asked to explain how to build this application.
+
+You are being asked to **actually build it**.
+
+Create and edit the project files, install dependencies, execute commands, run tests, inspect the UI, fix problems, and deliver a working application.
+
+Do not stop at planning.
+
+Do not generate pseudocode instead of implementation.
+
+Do not substitute simulated chatbot responses for real LLM integration.
+
+Do not compromise API contract compliance for visual styling.
+
+Use the attached PDF as the authoritative functional specification and https://opencode.ai/ as the visual design reference.
+
+Start by inspecting both references, creating the requirements checklist, and immediately implementing the project.

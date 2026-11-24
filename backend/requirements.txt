@@ -1,0 +1,14 @@
+# Direct dependencies pinned to the versions exercised by this test suite.
+# Update deliberately and re-run pytest; LiteLLM's cache path touches internal
+# modules, so an untested minor upgrade is riskier than it looks.
+fastapi==0.165.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.4
+pydantic-settings==2.16.3
+litellm==1.110.3
+# LiteLLM 1.110's cache-hit path imports its proxy utilities, which require
+# these two packages even for text-only chat. Without them a cache hit raises
+# ModuleNotFoundError. Pinned here so Docker and CI match the verified setup.
+orjson==3.13.0
+soundfile==0.14.0
+httpx==0.28.1
