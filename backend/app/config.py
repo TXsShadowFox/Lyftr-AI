@@ -82,6 +82,8 @@ class Settings(BaseSettings):
         origins = [part.strip() for part in self.allowed_origins.split(",") if part.strip()]
         if "*" in origins:
             return ["*"]
+        if not origins:
+            return ["http://localhost:3000", "http://127.0.0.1:3000"]
         return origins
 
 

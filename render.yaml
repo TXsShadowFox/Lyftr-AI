@@ -30,7 +30,7 @@ services:
       - key: LLM_API_KEYS
         sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: "*"
       - key: ENABLE_FAILURE_SIMULATION
         value: "true"
       - key: CACHE_ENABLED

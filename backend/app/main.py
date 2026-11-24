@@ -78,9 +78,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
+        allow_origin_regex=r"^https://.*\.vercel\.app$" if "*" not in settings.cors_origins else None,
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Accept", "Content-Type", "X-Simulate-Failure"],
+        allow_headers=["*"],
         max_age=600,
     )
 
