@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   Check,
   Copy,
+  PanelLeftClose,
   Plus,
   RefreshCw,
   X,
@@ -16,6 +17,7 @@ import { StatusChip } from "./StatusChip";
 
 interface SidebarProps {
   open: boolean;
+  desktopCollapsed: boolean;
   onClose: () => void;
   health: HealthState;
   isRefreshingHealth: boolean;
@@ -31,6 +33,7 @@ interface SidebarProps {
 
 export function Sidebar({
   open,
+  desktopCollapsed,
   onClose,
   health,
   isRefreshingHealth,
@@ -79,8 +82,10 @@ export function Sidebar({
     <aside
       id="app-sidebar"
       aria-label="Session navigation"
-      className={`fixed inset-y-0 left-0 z-40 flex w-[264px] shrink-0 flex-col border-r border-line bg-panel transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 flex w-[264px] shrink-0 flex-col border-r border-line bg-panel transition-[margin,transform] duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 ${
         open ? "translate-x-0" : "-translate-x-full"
+      } ${
+        desktopCollapsed ? "lg:-ml-[264px]" : "lg:ml-0"
       }`}
     >
       <div className="flex h-full min-h-0 flex-col overflow-y-auto">
@@ -99,10 +104,12 @@ export function Sidebar({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center border border-line text-body transition hover:border-line-strong hover:text-ink lg:hidden"
+            className="inline-flex h-8 w-8 items-center justify-center border border-line text-body transition hover:border-line-strong hover:text-ink"
             aria-label="Close navigation"
+            title="Hide sidebar"
           >
-            <X size={15} strokeWidth={1.75} />
+            <PanelLeftClose size={15} strokeWidth={1.75} className="hidden lg:block" />
+            <X size={15} strokeWidth={1.75} className="lg:hidden" />
           </button>
         </div>
 

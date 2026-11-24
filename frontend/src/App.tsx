@@ -13,19 +13,75 @@ export default function App() {
   const chat = useChat();
   const health = useHealth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("lyftr_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
+  );
   const [systemPrompt, setSystemPrompt] = useState("");
   const [promptTouched, setPromptTouched] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsDesktop(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSidebarOpen(false);
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        if (window.innerWidth >= 1024) {
+          handleToggleDesktop();
+        } else {
+          setSidebarOpen((prev) => !prev);
+        }
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  const handleToggleDesktop = () => {
+    setDesktopCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("lyftr_sidebar_collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleToggleSidebar = () => {
+    if (isDesktop) {
+      handleToggleDesktop();
+    } else {
+      setSidebarOpen((prev) => !prev);
+    }
+  };
+
+  const handleCloseSidebar = () => {
+    if (isDesktop) {
+      setDesktopCollapsed(true);
+      try {
+        localStorage.setItem("lyftr_sidebar_collapsed", "true");
+      } catch {}
+    } else {
+      setSidebarOpen(false);
+    }
+  };
+
+  const isSidebarOpen = isDesktop ? !desktopCollapsed : sidebarOpen;
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -78,7 +134,8 @@ export default function App() {
     <div className="flex h-dvh overflow-hidden bg-canvas">
       <Sidebar
         open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        desktopCollapsed={desktopCollapsed}
+        onClose={handleCloseSidebar}
         health={health.state}
         isRefreshingHealth={health.isRefreshing}
         onRefreshHealth={health.refresh}
@@ -105,7 +162,8 @@ export default function App() {
           health={health.state}
           sessionId={chat.sessionId}
           isSending={chat.isSending}
-          onOpenMenu={() => setSidebarOpen(true)}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
           onNewSession={handleNewSession}
         />
 

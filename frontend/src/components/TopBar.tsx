@@ -1,4 +1,4 @@
-import { Menu, Plus } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 
 import type { HealthState } from "../hooks/useHealth";
 import { shortSessionId } from "../lib/session";
@@ -8,7 +8,8 @@ interface TopBarProps {
   health: HealthState;
   sessionId: string;
   isSending: boolean;
-  onOpenMenu: () => void;
+  isSidebarOpen: boolean;
+  onToggleSidebar: () => void;
   onNewSession: () => void;
 }
 
@@ -16,7 +17,8 @@ export function TopBar({
   health,
   sessionId,
   isSending,
-  onOpenMenu,
+  isSidebarOpen,
+  onToggleSidebar,
   onNewSession,
 }: TopBarProps) {
   return (
@@ -24,12 +26,17 @@ export function TopBar({
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
-          onClick={onOpenMenu}
-          className="inline-flex h-8 w-8 items-center justify-center border border-line text-body transition hover:border-line-strong hover:text-ink lg:hidden"
-          aria-label="Open navigation"
+          onClick={onToggleSidebar}
+          className="inline-flex h-8 w-8 items-center justify-center border border-line text-body transition hover:border-line-strong hover:text-ink"
+          aria-label={isSidebarOpen ? "Collapse sidebar" : "Open navigation"}
+          title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
           aria-controls="app-sidebar"
         >
-          <Menu size={15} strokeWidth={1.75} />
+          {isSidebarOpen ? (
+            <PanelLeftClose size={15} strokeWidth={1.75} />
+          ) : (
+            <PanelLeftOpen size={15} strokeWidth={1.75} />
+          )}
         </button>
         <div className="flex min-w-0 items-center gap-2 font-mono text-2xs uppercase tracking-[0.14em]">
           <span className="whitespace-nowrap text-muted">LYFTR AI</span>
