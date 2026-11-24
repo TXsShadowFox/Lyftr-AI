@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
+os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+
 import litellm
+
+litellm.telemetry = False
+litellm.drop_params = True
+litellm.suppress_debug_info = True
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

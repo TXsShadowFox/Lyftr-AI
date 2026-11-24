@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { UiMessage } from "../types";
 import { AssistantMeta } from "./AssistantMeta";
 
@@ -59,6 +60,16 @@ function AssistantMessage({
 }
 
 function ThinkingMessage() {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const started = Date.now();
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - started) / 100) / 10);
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <article
       className="relative animate-fade-up border-l-2 border-line-strong pl-4 sm:pl-5"
@@ -70,7 +81,7 @@ function ThinkingMessage() {
         </span>
         <span className="h-1 w-1 bg-line-strong" />
         <span className="font-mono text-2xs uppercase tracking-[0.12em] text-faint">
-          Generating
+          Generating · {elapsed.toFixed(1)}s
         </span>
       </div>
       <div className="mt-4 flex items-center gap-1.5" aria-hidden="true">
