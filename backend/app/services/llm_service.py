@@ -88,107 +88,101 @@ class LLMService:
             logger.error("llm_pool_empty")
             raise AllProvidersUnavailableError("no keys configured")
 
-        for key in self.keys:
-            simulated_status = simulated_status_for(key.id, simulation)
-            if simulated_status is not None:
-                failed_attempts += 1
-                logger.info(
-                    "llm_key_simulated_failure key_id=%s status=%s attempt=%d",
-                    key.id,
-                    simulated_status,
-                    failed_attempts,
-                )
-                continue
+        candidate_models = [self.settings.llm_model]
+        if (
+            not simulation
+            and not self.settings.llm_api_base
+            and self.settings.llm_model.startswith("gemini/")
+        ):
+            alt_model = (
+                "gemini/gemini-3.5-flash-lite"
+                if self.settings.llm_model != "gemini/gemini-3.5-flash-lite"
+                else "gemini/gemini-2.5-flash"
+            )
+            candidate_models.append(alt_model)
 
-            kwargs: dict[str, Any] = {
-                "model": self.settings.llm_model,
-                "messages": messages,
-                "api_key": key.value,
-                "temperature": self.settings.llm_temperature,
-                "timeout": self.settings.llm_request_timeout,
-                "num_retries": self.settings.llm_num_retries,
-                # Prevent the OpenAI SDK from retrying the same failed key
-                # behind our back; failover is owned by this service.
-                "max_retries": 0,
-            }
-            if self.settings.llm_api_base:
-                kwargs["api_base"] = self.settings.llm_api_base
-            else:
-                # When using real providers without an override api_base, route keys
-                # from different providers (e.g. Gemini direct and OpenRouter gateway) correctly.
-                if key.value.startswith("sk-or-"):
-                    if kwargs["model"].startswith("gemini/"):
-                        raw_model = kwargs["model"].removeprefix("gemini/")
-                        if raw_model in ("gemini-2.0-flash", "gemini-2.0-flash-001"):
-                            kwargs["model"] = "openrouter/google/gemini-2.0-flash-001"
-                        else:
-                            kwargs["model"] = f"openrouter/google/{raw_model}"
-                    elif not kwargs["model"].startswith("openrouter/"):
-                        kwargs["model"] = f"openrouter/{kwargs['model']}"
-                elif kwargs["model"].startswith("openrouter/google/"):
-                    kwargs["model"] = "gemini/" + kwargs["model"].removeprefix("openrouter/google/")
+        for target_model in candidate_models:
+            is_fallback_model = target_model != self.settings.llm_model
+            for key in self.keys:
+                if is_fallback_model and key.value.startswith("sk-or-"):
+                    continue
 
-            if self.settings.llm_max_tokens is not None:
-                kwargs["max_tokens"] = self.settings.llm_max_tokens
-            if cache_controls is not None:
-                kwargs["cache"] = cache_controls
-
-            try:
-                response = self._completion(**kwargs)
-                reply = _extract_reply(response)
-                if not reply.strip():
-                    raise EmptyProviderResponseError("provider returned an empty reply")
-
-                hidden = getattr(response, "_hidden_params", None) or {}
-                cache_hit = hidden.get("cache_hit") is True
-                input_tokens, output_tokens = _extract_usage(response)
-                latency_ms = max(0, int(round((time.perf_counter() - started) * 1000)))
-
-                if cache_hit:
+                simulated_status = simulated_status_for(key.id, simulation)
+                if simulated_status is not None:
+                    failed_attempts += 1
                     logger.info(
-                        "llm_cache_hit model=%s latency_ms=%d",
-                        self.settings.llm_model,
+                        "llm_key_simulated_failure key_id=%s status=%s attempt=%d",
+                        key.id,
+                        simulated_status,
+                        failed_attempts,
+                    )
+                    continue
+
+                kwargs = self._build_completion_kwargs(
+                    target_model=target_model,
+                    messages=messages,
+                    api_key=key.value,
+                    cache_controls=cache_controls,
+                )
+
+                try:
+                    response = self._completion(**kwargs)
+                    reply = _extract_reply(response)
+                    if not reply.strip():
+                        raise EmptyProviderResponseError("provider returned an empty reply")
+
+                    hidden = getattr(response, "_hidden_params", None) or {}
+                    cache_hit = hidden.get("cache_hit") is True
+                    input_tokens, output_tokens = _extract_usage(response)
+                    latency_ms = max(0, int(round((time.perf_counter() - started) * 1000)))
+
+                    if cache_hit:
+                        logger.info(
+                            "llm_cache_hit model=%s latency_ms=%d",
+                            target_model,
+                            latency_ms,
+                        )
+                        return LLMResult(
+                            reply=reply,
+                            model=target_model,
+                            latency_ms=latency_ms,
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            key_id=None,
+                            fallback_attempts=0,
+                            resolution_source="LLM_CACHE",
+                        )
+
+                    logger.info(
+                        "llm_live_success key_id=%s model=%s fallback_attempts=%d latency_ms=%d",
+                        key.id,
+                        target_model,
+                        failed_attempts,
                         latency_ms,
                     )
                     return LLMResult(
                         reply=reply,
-                        model=self.settings.llm_model,
+                        model=target_model,
                         latency_ms=latency_ms,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
-                        key_id=None,
-                        fallback_attempts=0,
-                        resolution_source="LLM_CACHE",
+                        key_id=key.id,
+                        fallback_attempts=failed_attempts,
+                        resolution_source="LIVE_INFERENCE",
                     )
-
-                logger.info(
-                    "llm_live_success key_id=%s fallback_attempts=%d latency_ms=%d",
-                    key.id,
-                    failed_attempts,
-                    latency_ms,
-                )
-                return LLMResult(
-                    reply=reply,
-                    model=self.settings.llm_model,
-                    latency_ms=latency_ms,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    key_id=key.id,
-                    fallback_attempts=failed_attempts,
-                    resolution_source="LIVE_INFERENCE",
-                )
-            except Exception as exc:  # provider failures must become failover
-                if not is_retryable_failure(exc):
-                    raise
-                last_error = exc
-                failed_attempts += 1
-                logger.warning(
-                    "llm_key_failed key_id=%s error=%s attempt=%d",
-                    key.id,
-                    describe_error(exc),
-                    failed_attempts,
-                )
-                continue
+                except Exception as exc:  # provider failures must become failover
+                    if not is_retryable_failure(exc):
+                        raise
+                    last_error = exc
+                    failed_attempts += 1
+                    logger.warning(
+                        "llm_key_failed key_id=%s model=%s error=%s attempt=%d",
+                        key.id,
+                        target_model,
+                        describe_error(exc),
+                        failed_attempts,
+                    )
+                    continue
 
         logger.error(
             "llm_pool_exhausted attempts=%d last_error=%s",
@@ -196,6 +190,47 @@ class LLMService:
             describe_error(last_error) if last_error else "simulated",
         )
         raise AllProvidersUnavailableError("all providers unavailable")
+
+    def _build_completion_kwargs(
+        self,
+        target_model: str,
+        messages: list[dict[str, str]],
+        api_key: str,
+        cache_controls: dict[str, bool] | None,
+    ) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "model": target_model,
+            "messages": messages,
+            "api_key": api_key,
+            "temperature": self.settings.llm_temperature,
+            "timeout": self.settings.llm_request_timeout,
+            "num_retries": self.settings.llm_num_retries,
+            # Prevent the OpenAI SDK from retrying the same failed key
+            # behind our back; failover is owned by this service.
+            "max_retries": 0,
+        }
+        if self.settings.llm_api_base:
+            kwargs["api_base"] = self.settings.llm_api_base
+        else:
+            # When using real providers without an override api_base, route keys
+            # from different providers (e.g. Gemini direct and OpenRouter gateway) correctly.
+            if api_key.startswith("sk-or-"):
+                if target_model.startswith("gemini/"):
+                    raw_model = target_model.removeprefix("gemini/")
+                    if raw_model in ("gemini-2.0-flash", "gemini-2.0-flash-001"):
+                        kwargs["model"] = "openrouter/google/gemini-2.0-flash-001"
+                    else:
+                        kwargs["model"] = f"openrouter/google/{raw_model}"
+                elif not target_model.startswith("openrouter/"):
+                    kwargs["model"] = f"openrouter/{target_model}"
+            elif target_model.startswith("openrouter/google/"):
+                kwargs["model"] = "gemini/" + target_model.removeprefix("openrouter/google/")
+
+        if self.settings.llm_max_tokens is not None:
+            kwargs["max_tokens"] = self.settings.llm_max_tokens
+        if cache_controls is not None:
+            kwargs["cache"] = cache_controls
+        return kwargs
 
 
 def _extract_reply(response: Any) -> str:
